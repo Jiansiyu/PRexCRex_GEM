@@ -7,9 +7,16 @@ A modified version of the UVa MPD4 decoder.
 * change the data search structure of the 'inputhandler.cpp' so as to decode the PRex data 
 * changed the grephic out style
 
+## Dev Plan
+### Raw display function 
+
+- [ ] Change the Raw Display
+- [ ] in the raw display add the cluster searching 
+- [ ] add the text information on the canvas 
+- [ ] display the frame size and frame check information
+
 
 ## pedestal generator instructions
-
 ### 1. check the whether the mapping match the prex mapping
 ### 2. change the config/gem.cfg file 
     # runType
