@@ -303,26 +303,24 @@ int InputHandler::ProcessAllFiles()
 	    //for_each(pList->begin(), pList->end(), toCout());
 	    //cout<<"##"<<endl;
 	    //getchar();
-
-	    if(EvtID%1000==0)
+	    cout<<"number of banks: "<<mpdEventList->size()<<endl;
+          if(EvtID%1000==0)
 	      {
 		cout<<"event: "<<EvtID<<endl;
-		//cout<<"number of banks: "<<mpdEventList->size()<<endl;
 	      }
 	    evioDOMNodeList::iterator iter;
 	    for(iter=mpdEventList->begin(); iter!=mpdEventList->end(); ++iter)
 	      {
 		int banktag = (*iter)->tag;
-		
        		switch(banktag){
 		case mpd_tag:
 			{
 			vector<uint32_t> *block_vec = (*iter)->getVector<uint32_t>();
-		  	if(block_vec->size()!=33063) break;
+		  	if((block_vec->size()!=33063)&&(block_vec->size()!=30707)) break;   // 30707 CRex. 33063 PRex
 		  	entry+=ProcessSspBlock(*block_vec);
 		 	break;
 			}
-		  //	default: 
+		  //default:
 		  // break;
 		}
 	      }
