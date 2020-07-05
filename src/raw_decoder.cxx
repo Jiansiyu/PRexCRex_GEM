@@ -9,6 +9,8 @@
 #include <iostream>
 #include <utility>
 
+#include "TPaveText.h"
+#include "TLatex.h"
 #include <TH1F.h>
 #include <TCanvas.h>
 #include <TStyle.h>
@@ -185,13 +187,10 @@ map<int, TH1F* > RawDecoder::DrawRawHisto(TCanvas *c)
   int adc_ch=0;
   int hybridID=0;
   int nbAPVs = 0 ;
-  //  cout<<endl;
-  //  cout<<endl;
 
   map<int, vector<int> >::iterator it;
 
   if (mpd_off == 9999) { // compute for first event only
-  
     for(it = mAPVRawSingleEvent.begin(); it!=mAPVRawSingleEvent.end(); ++it) {
       hybridID=it->first;
       mpd_id = GetMPD_ID(hybridID);     
