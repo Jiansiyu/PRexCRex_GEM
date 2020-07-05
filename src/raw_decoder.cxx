@@ -178,6 +178,83 @@ map<int, vector<int> > RawDecoder::GetDecoded()
   return mAPVRawSingleEvent;
 }
 
+
+//=============================================================
+// ARGS:
+//      C; the canvas that used for draw the plot
+map<int, TH1F* > RawDecoder::DrawCorrectedRawHisto(map<int,vector<int> > mMapping,TCanvas *c) {
+    static int idx_ec=0;
+    static int mpd_off=9999; // first mpd id
+    int mpd_id=0;
+    int adc_ch=0;
+    int hybridID=0;
+    int nbAPVs = 0 ;
+
+    map<int, vector<int> >::iterator it;
+
+    //GEM plane ID, GEM dimension, Ordered Histogram
+//    std::map<int, std::map<int, TH1F *>>  GEMPlanHisto;
+//    // buffer the mMapping infor
+//    // GEM Plane       GEM plane  Maxim STrip infor
+//    std::map<int, std::map<int,int>>  bufferMap;
+//    for(auto iter=mMapping.begin(); iter!=mMapping.end();++iter){
+//        hybridID = it->first;
+//        mpd_id = GetMPD_ID(hybridID);
+//        adc_ch = GetADC_ch(hybridID);
+//
+//        int detID = mMapping[hybridID][0];
+//        int planeID = mMapping[hybridID][1];
+//
+//        std::cout<<"DetID::"<<detID<<"  planeID"<<planeID<<"    srip"<<128+mMapping[hybridID][2]<<std::endl;
+//
+//    }
+
+    if (mpd_off == 9999) { // compute for first event only
+        for(it = mAPVRawSingleEvent.begin(); it!=mAPVRawSingleEvent.end(); ++it) {
+            hybridID=it->first;
+            mpd_id = GetMPD_ID(hybridID);
+            if (mpd_off>mpd_id) mpd_off=mpd_id;
+        }
+    }
+    int mpd_count = -1, last_mpd_id = -1, draw_index;
+    for(it = mAPVRawSingleEvent.begin(); it!=mAPVRawSingleEvent.end(); ++it)
+    {
+        hybridID=it->first;
+        mpd_id = GetMPD_ID(hybridID);
+        adc_ch = GetADC_ch(hybridID);
+        vector<int> adc_temp = it->second;
+        int N = adc_temp.size();//cout<<"adc_tempsize:"<<N<<endl;
+
+        std::cout<<"MPD:: "<< mpd_id<<std::endl;
+        TH1F* h = new TH1F(Form("mpd_%d_ch_%d",mpd_id, adc_ch), Form("mpd_%d_ch_%d_raw_data",mpd_id, adc_ch), 780, 0, 779);
+
+        //cout<<"EventNb = "<<idx_ec<<"  mpdid: "<<mpd_id<<"  adcCh: "<<adc_ch<<"  histo: "<<h->GetName()<<" nbAPVs: "<<nbAPVs<<endl;
+
+        for(int i=0;i<N;i++) h->Fill(i+1, (Float_t) adc_temp[i]);
+
+        mAPVRawHisto[hybridID] = h;
+
+        if(mpd_id != last_mpd_id){
+            mpd_count++;
+        }
+
+        draw_index = mpd_count * 16 + adc_ch + 1;
+
+        //c->cd((mpd_id-mpd_off)*15+adc_ch+1)->SetLogy();
+        c->cd(draw_index);//->SetLogy();
+        mAPVRawHisto[hybridID]->SetMaximum(3000);
+        mAPVRawHisto[hybridID]->SetMinimum(100);
+        mAPVRawHisto[hybridID]->Draw("HISTO");
+//nbAPVs++ ;
+        last_mpd_id = mpd_id;
+
+    }
+
+
+    return  mAPVRawHisto;
+}
+
+
 //===========================================================================
 map<int, TH1F* > RawDecoder::DrawRawHisto(TCanvas *c)
 {
@@ -210,7 +287,7 @@ map<int, TH1F* > RawDecoder::DrawRawHisto(TCanvas *c)
       std::cout<<"MPD:: "<< mpd_id<<std::endl;
       TH1F* h = new TH1F(Form("mpd_%d_ch_%d",mpd_id, adc_ch), Form("mpd_%d_ch_%d_raw_data",mpd_id, adc_ch), 780, 0, 779);
  
-      //     cout<<"EventNb = "<<idx_ec<<"  mpdid: "<<mpd_id<<"  adcCh: "<<adc_ch<<"  histo: "<<h->GetName()<<" nbAPVs: "<<nbAPVs<<endl;
+      //cout<<"EventNb = "<<idx_ec<<"  mpdid: "<<mpd_id<<"  adcCh: "<<adc_ch<<"  histo: "<<h->GetName()<<" nbAPVs: "<<nbAPVs<<endl;
  
       for(int i=0;i<N;i++) h->Fill(i+1, (Float_t) adc_temp[i]);
        

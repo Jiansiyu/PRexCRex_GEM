@@ -63,7 +63,8 @@ public:
   //map<int, map<int, map<int, vector<int> > > > mPedestalTsAdc;
   //map<int, map<int, TH1F* > > GetAPVRawHisto();
   map<int, TH1F* > DrawRawHisto(TCanvas *c);
-  //  map<int, TH1F* > DrawRawHisto(TCanvas *c0,TCanvas *c1,TCanvas *c2);
+  map<int, TH1F* > DrawCorrectedRawHisto(map<int,vector<int> > mMapping,TCanvas *c);
+    //  map<int, TH1F* > DrawRawHisto(TCanvas *c0,TCanvas *c1,TCanvas *c2);
   //  map<int, TH1F* > DrawRawHisto(TCanvas *c0,TCanvas *c1,TCanvas *c2,TCanvas *c3, TCanvas *c4, TCanvas *c5, TCanvas *c6,TCanvas *c7,TCanvas *c8, TCanvas *c9, TCanvas *c10, TCanvas *c11);
   map<int, vector<int> > DrawHits(map<int,vector<int> > mMapping, map<int,vector<int> > mPedestalMean, map<int,vector<int> > mPedestalRMS, TCanvas *c);
   map<int, vector<int> > mPedestalTsAdc;
