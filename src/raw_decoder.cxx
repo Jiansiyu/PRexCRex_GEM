@@ -192,23 +192,6 @@ map<int, TH1F* > RawDecoder::DrawCorrectedRawHisto(map<int,vector<int> > mMappin
 
     map<int, vector<int> >::iterator it;
 
-    //GEM plane ID, GEM dimension, Ordered Histogram
-//    std::map<int, std::map<int, TH1F *>>  GEMPlanHisto;
-//    // buffer the mMapping infor
-//    // GEM Plane       GEM plane  Maxim STrip infor
-//    std::map<int, std::map<int,int>>  bufferMap;
-//    for(auto iter=mMapping.begin(); iter!=mMapping.end();++iter){
-//        hybridID = it->first;
-//        mpd_id = GetMPD_ID(hybridID);
-//        adc_ch = GetADC_ch(hybridID);
-//
-//        int detID = mMapping[hybridID][0];
-//        int planeID = mMapping[hybridID][1];
-//
-//        std::cout<<"DetID::"<<detID<<"  planeID"<<planeID<<"    srip"<<128+mMapping[hybridID][2]<<std::endl;
-//
-//    }
-
     if (mpd_off == 9999) { // compute for first event only
         for(it = mAPVRawSingleEvent.begin(); it!=mAPVRawSingleEvent.end(); ++it) {
             hybridID=it->first;
@@ -216,42 +199,112 @@ map<int, TH1F* > RawDecoder::DrawCorrectedRawHisto(map<int,vector<int> > mMappin
             if (mpd_off>mpd_id) mpd_off=mpd_id;
         }
     }
-    int mpd_count = -1, last_mpd_id = -1, draw_index;
+
+    std::map<int, std::map<int, TH1F *>>planeRawHist;
+
+    std::cout<<"Map Size"<<mMapping.size()<<std::endl;
+    //check how many GEM modules and CREATE
+    std::map<int, std::map<int, int>> maxStrips;
+    for (auto iter = mMapping.begin(); iter !=mMapping.end(); iter++){
+        // load the pdestal to read
+        hybridID = iter->first;
+        int detID = mMapping[hybridID][0];
+        int planeID = mMapping[hybridID][1];
+        int RstripNb=128;
+        int RstripPos=RstripNb+128*mMapping[hybridID][2];
+
+        if((!(maxStrips.find(detID)!=maxStrips.end() || maxStrips[detID].find(planeID)!=maxStrips[detID].end()))|| maxStrips[detID][planeID] < RstripPos){
+            maxStrips[detID][planeID]=RstripPos;
+        }
+    }
+
+    // print out the detector information
+    for (auto iter = maxStrips.begin(); iter!=maxStrips.end(); iter++){
+        for (auto itter = iter->second.begin(); itter!=iter->second.end() ; ++itter) {
+            std::cout <<"Detector::"<<iter->first<<"    PlaneID::"<<itter->first<<"    value::"<<itter->second<<std::endl;
+            planeRawHist[iter->first][itter->first]=new TH1F(Form("Detector%d_dimension%d_rawHist",iter->first,itter->first),Form("Detector%d_dimension%d_rawHist",iter->first,itter->first),itter->second,0,itter->second);
+        }
+    }
+
+    // write the data in to the orded raw histo
     for(it = mAPVRawSingleEvent.begin(); it!=mAPVRawSingleEvent.end(); ++it)
     {
-        hybridID=it->first;
+        hybridID = it->first;
         mpd_id = GetMPD_ID(hybridID);
         adc_ch = GetADC_ch(hybridID);
+
         vector<int> adc_temp = it->second;
-        int N = adc_temp.size();//cout<<"adc_tempsize:"<<N<<endl;
+        int N = adc_temp.size();//774
+        int TSsize=N/129;
 
-        std::cout<<"MPD:: "<< mpd_id<<std::endl;
-        TH1F* h = new TH1F(Form("mpd_%d_ch_%d",mpd_id, adc_ch), Form("mpd_%d_ch_%d_raw_data",mpd_id, adc_ch), 780, 0, 779);
-
-        //cout<<"EventNb = "<<idx_ec<<"  mpdid: "<<mpd_id<<"  adcCh: "<<adc_ch<<"  histo: "<<h->GetName()<<" nbAPVs: "<<nbAPVs<<endl;
-
-        for(int i=0;i<N;i++) h->Fill(i+1, (Float_t) adc_temp[i]);
-
-        mAPVRawHisto[hybridID] = h;
-
-        if(mpd_id != last_mpd_id){
-            mpd_count++;
+        // check the macth of the frame size
+        if(adc_temp.size()!=129*3){
+            if((adc_temp.size()>129*3)&&(adc_temp[386]==2)&&(adc_temp[128]==0)&&(adc_temp[257]==1)){
+                adc_temp.resize(129*3);
+            }else{
+                std::cout<<"  MisMatch::  expect 387   get : "<<adc_temp.size()<<"   skip!!("<<__FUNCTION__<<"@"<<__LINE__<<")"<<std::endl;
+                return  mAPVRawHisto;
+            }
         }
+        for(int j=0; j<128;j++){
+            int adcSum_temp=0;
+            for(int i=0;i<TSsize;i++){
+                adcSum_temp = adcSum_temp+adc_temp[j+129*i];
+            }
+            adcSum_temp = adcSum_temp/TSsize;
 
-        draw_index = mpd_count * 16 + adc_ch + 1;
+            //get the position
+            int RstripPos=j;
+            int RstripNb = ChNb[j];
 
-        //c->cd((mpd_id-mpd_off)*15+adc_ch+1)->SetLogy();
-        c->cd(draw_index);//->SetLogy();
-        mAPVRawHisto[hybridID]->SetMaximum(3000);
-        mAPVRawHisto[hybridID]->SetMinimum(100);
-        mAPVRawHisto[hybridID]->Draw("HISTO");
-//nbAPVs++ ;
-        last_mpd_id = mpd_id;
+            // check the existance of HIOD
+            if(mMapping.find(hybridID)!=mMapping.end()){
+                RstripNb=RstripNb+(127-2*RstripNb)*mMapping[hybridID][3];                   //re-matching for inverted strips Nb
+                RstripPos=RstripNb+128*mMapping[hybridID][2];                               // calculate position
+                int detID = mMapping[hybridID][0];
+                int planeID = mMapping[hybridID][1];
+                planeRawHist[detID][planeID]->Fill(RstripPos, adcSum_temp);
+            } else{
+                std::cout<<"[WORNING]::"<<__FUNCTION__ <<" CAN NOT FIND "<<hybridID<<" in the Mapping file!!!!!!!(MPD->"<<mpd_id<<",  apv->"<<adc_ch<<")"<<std::endl;
+            }
 
+        }
     }
 
 
-    return  mAPVRawHisto;
+    c->Clear();
+    c->Divide(2,planeRawHist.size());
+    double counter_temp=1;
+    for (auto iter = planeRawHist.begin();iter!=planeRawHist.end(); iter++){
+        c->cd(counter_temp);
+        if(iter->second.find(0)!=iter->second.end()) (iter->second)[0]->Draw("hist");
+        c->cd(counter_temp+1);
+        if(iter->second.find(1)!=iter->second.end()) (iter->second)[1]->Draw("hist");
+        counter_temp+=2;
+    }
+    c->Update();
+
+    int typc = getchar();
+    // int typc=-1;
+    //  c->SaveAs(Form("Result/rawhisto_e%04d.png",idx_ec));
+    idx_ec++;
+
+    if ((typc==83) || (typc==115)) { // if s or S has pressed, it save the histos in a png file
+        c->SaveAs("Result/rawhisto.png");
+        getchar(); // return key
+    }
+
+    if ((typc==80) || (typc==112)) { // if p or P has pressed, it save the histos in a pdf file
+        c->SaveAs("Result/rawhisto.pdf");
+        getchar(); // return key
+    }
+
+    for(auto iter = planeRawHist.begin(); iter!=planeRawHist.end();iter++){
+        for(auto itter=iter->second.begin(); itter!=iter->second.end(); itter++){
+            itter->second->Delete();
+        }
+    }
+    return mAPVRawHisto;
 }
 
 

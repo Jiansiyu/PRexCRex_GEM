@@ -384,10 +384,10 @@ int InputHandler::ProcessSingleSspEvent(const vector<uint32_t> &block_vec, int i
   RawDecoder raw_decoder(block_vec,istart,iend);
   
   if(runtype=="RawDataMonitor")  {
-      raw_decoder.DrawRawHisto(cRaw); // Danning initial version
-//      raw_decoder.DrawCorrectedRawHisto(mMapping,cRaw);    // Modified version, mapped the APV strip and APV position to the read oder
+//      raw_decoder.DrawRawHisto(cRaw); // Danning initial version
+      raw_decoder.DrawCorrectedRawHisto(mMapping,cRaw);    // Modified version, mapped the APV strip and APV position to the read oder
   }
-  
+
   //pedestal mode
   if(runtype=="CalPedestal")     
     {
