@@ -62,6 +62,7 @@ class InputHandler
   //TDC branch
   Int_t ntdc=0, *tCH; 
   Double_t *ttiming;
+  double_t stripRMS; // buffer the RMS of give planeiD
   
 
 

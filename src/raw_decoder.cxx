@@ -337,7 +337,7 @@ map<int, TH1F* > RawDecoder::DrawRawHisto(TCanvas *c)
       vector<int> adc_temp = it->second;
       int N = adc_temp.size();//cout<<"adc_tempsize:"<<N<<endl;
  
-      std::cout<<"MPD:: "<< mpd_id<<std::endl;
+     // std::cout<<"MPD:: "<< mpd_id<<std::endl;
       TH1F* h = new TH1F(Form("mpd_%d_ch_%d",mpd_id, adc_ch), Form("mpd_%d_ch_%d_raw_data",mpd_id, adc_ch), 780, 0, 779);
  
       //cout<<"EventNb = "<<idx_ec<<"  mpdid: "<<mpd_id<<"  adcCh: "<<adc_ch<<"  histo: "<<h->GetName()<<" nbAPVs: "<<nbAPVs<<endl;
@@ -383,7 +383,7 @@ map<int, TH1F* > RawDecoder::DrawRawHisto(TCanvas *c)
   idx_ec++;
 
   if ((typc==83) || (typc==115)) { // if s or S has pressed, it save the histos in a png file
-    c->SaveAs("Result/rawhisto.png");
+    c->SaveAs("Result/rawhisto.root");
     getchar(); // return key
   }
 
@@ -490,6 +490,46 @@ map<int, vector<int> > RawDecoder::ZeroSup(map<int,vector<int> > mMapping, map<i
   int adc_ch=0;
   int hybridID=0;
 
+
+
+
+    //===================================================================================================================
+    std::map<int, std::map<int, TH1F *>>PlaneRawHistRaw;  // strips　
+    std::map<int, std::map<int, TH1F *>>PlaneCutThresHist;  // strips　
+    std::map<int, std::map<int, TH1F *>>PlaneRawHist;  // strips that pass the 5-sigma cut
+    std::map<int, std::map<int, TH1F *>>PlaneRawHist_NonZeroCut;  // strips that pass the 5-sigma cut
+//    std::cout<<"Map Size"<<mMapping.size()<<std::endl;
+    //check how many GEM modules and CREATE
+    std::map<int, std::map<int, int>> maxStrips;
+    for (auto iter = mMapping.begin(); iter !=mMapping.end(); iter++){
+        // load the pdestal to read
+        int hybridID = iter->first;
+        int detID = mMapping[hybridID][0];
+        int planeID = mMapping[hybridID][1];
+        int RstripNb=128;
+        int RstripPos=RstripNb+128*mMapping[hybridID][2];
+
+        if((!(maxStrips.find(detID)!=maxStrips.end() || maxStrips[detID].find(planeID)!=maxStrips[detID].end()))|| maxStrips[detID][planeID] < RstripPos){
+            maxStrips[detID][planeID]=RstripPos;
+        }
+    }
+
+    // print out the detector information
+    for (auto iter = maxStrips.begin(); iter!=maxStrips.end(); iter++){
+        for (auto itter = iter->second.begin(); itter!=iter->second.end() ; ++itter) {
+            PlaneRawHistRaw[iter->first][itter->first]=new TH1F(Form("Detector%d_dimension%d_rawHist",iter->first,itter->first),Form("Detector%d_dimension%d_rawHist",iter->first,itter->first),itter->second,0,itter->second);
+            PlaneRawHist[iter->first][itter->first]=new TH1F(Form("Detector%d_dimension%d_HitHist",iter->first,itter->first),Form("Detector%d_dimension%d_HitHist",iter->first,itter->first),itter->second,0,itter->second);
+            PlaneRawHist_NonZeroCut[iter->first][itter->first]=new TH1F(Form("Detector%d_dimension%d_before0",iter->first,itter->first),Form("Detector%d_dimension%d_before0",iter->first,itter->first),itter->second,0,itter->second);
+            PlaneCutThresHist[iter->first][itter->first]=new TH1F(Form("Detector%d_dimension%d_thrHist",iter->first,itter->first),Form("Detector%d_dimension%d_thrHist",iter->first,itter->first),itter->second,0,itter->second);
+            PlaneCutThresHist[iter->first][itter->first]->SetLineColor(6);
+            PlaneRawHistRaw[iter->first][itter->first]->SetLineColor(7);
+            PlaneRawHist[iter->first][itter->first]->SetLineColor(2);
+        }
+    }
+//===================================================================================================================
+
+
+  double gemPlaneMaxRMS=0.0;
   map<int, vector<int> >::iterator it;
   for(it = mAPVRawSingleEvent.begin(); it!=mAPVRawSingleEvent.end(); ++it)
   {
@@ -516,9 +556,6 @@ map<int, vector<int> > RawDecoder::ZeroSup(map<int,vector<int> > mMapping, map<i
 		return nullmap;
 	}
     }
-    
-
-
 
     //cout<<TSsize<<endl;//774
     int CommonMode[TSsize];
@@ -563,6 +600,32 @@ map<int, vector<int> > RawDecoder::ZeroSup(map<int,vector<int> > mMapping, map<i
 	 
 	//cout<<j<<"Mean  "<<mPedestalMean[mpd_id][adc_ch][j]<<"  "<<mPedestalRMS[mpd_id][adc_ch][j]<<endl;
 
+	//========================================================================================================
+	{
+	    if((mPedestalRMS.find(hybridID)!=mPedestalRMS.end()))
+              {
+                  int RstripPos=j;
+                  int RstripNb = ChNb[j];
+
+                  RstripNb=RstripNb+(127-2*RstripNb)*mMapping[hybridID][3];                   //re-matching for inverted strips Nb
+                  RstripPos=RstripNb+128*mMapping[hybridID][2];                               // calculate position
+
+                  int detID = mMapping[hybridID][0];
+                  int planeID = mMapping[hybridID][1];
+                  int HitHybridID = (detID<<13)|(planeID<<12)|RstripPos;
+
+                  PlaneRawHist_NonZeroCut[detID][planeID]->Fill(RstripPos,adcSum_temp);
+                  if((adcSum_temp>sigmacut*mPedestalRMS[hybridID][j])){
+                      PlaneRawHist[detID][planeID]->Fill(RstripPos,adcSum_temp);
+                  }
+                  // Get all the hit, and draw it into the files
+              }
+
+    }
+//========================================================================================================
+
+
+
 	if(adcSum_temp>sigmacut*mPedestalRMS[hybridID][j])
 	  { 
 	  
@@ -588,7 +651,17 @@ map<int, vector<int> > RawDecoder::ZeroSup(map<int,vector<int> > mMapping, map<i
 	  } 
 
       }  
-  }// 
+  }//
+  
+  // get the maximum RMS, AND apply cut
+  for(auto iter = PlaneRawHist.begin(); iter!=PlaneRawHist.end(); iter++){
+      for (auto itter=iter->second.begin();itter!=iter->second.end();itter++){
+          if(gemPlaneMaxRMS< itter->second->GetRMS()) gemPlaneMaxRMS=itter->second->GetRMS();
+      }
+  }
+
+  if(gemPlaneMaxRMS > 280) mmHit.clear();
+
   return mmHit;
 }
 
@@ -598,16 +671,52 @@ map<int, vector<int> > RawDecoder::DrawHits(map<int,vector<int> > mMapping, map<
 {
   std::map<int,std::map<int,std::map<int,int>>> plotData;
 
+    std::map<int, std::map<int, TH1F *>>PlaneRawHistRaw;  // strips　
+    std::map<int, std::map<int, TH1F *>>PlaneCutThresHist;  // strips　
+    std::map<int, std::map<int, TH1F *>>PlaneRawHist;  // strips that pass the 5-sigma cut
+    std::map<int, std::map<int, TH1F *>>PlaneRawHist_NonZeroCut;  // strips that pass the 5-sigma cut
+
+
+//    std::cout<<"Map Size"<<mMapping.size()<<std::endl;
+    //check how many GEM modules and CREATE
+    std::map<int, std::map<int, int>> maxStrips;
+    for (auto iter = mMapping.begin(); iter !=mMapping.end(); iter++){
+        // load the pdestal to read
+        int hybridID = iter->first;
+        int detID = mMapping[hybridID][0];
+        int planeID = mMapping[hybridID][1];
+        int RstripNb=128;
+        int RstripPos=RstripNb+128*mMapping[hybridID][2];
+
+        if((!(maxStrips.find(detID)!=maxStrips.end() || maxStrips[detID].find(planeID)!=maxStrips[detID].end()))|| maxStrips[detID][planeID] < RstripPos){
+            maxStrips[detID][planeID]=RstripPos;
+        }
+    }
+
+    // print out the detector information
+    for (auto iter = maxStrips.begin(); iter!=maxStrips.end(); iter++){
+        for (auto itter = iter->second.begin(); itter!=iter->second.end() ; ++itter) {
+//            std::cout <<"Detector::"<<iter->first<<"    PlaneID::"<<itter->first<<"    value::"<<itter->second<<std::endl;
+            PlaneRawHistRaw[iter->first][itter->first]=new TH1F(Form("Detector%d_dimension%d_rawHist",iter->first,itter->first),Form("Detector%d_dimension%d_rawHist",iter->first,itter->first),itter->second,0,itter->second);
+            PlaneRawHist[iter->first][itter->first]=new TH1F(Form("Detector%d_dimension%d_HitHist",iter->first,itter->first),Form("Detector%d_dimension%d_HitHist",iter->first,itter->first),itter->second,0,itter->second);
+            PlaneRawHist_NonZeroCut[iter->first][itter->first]=new TH1F(Form("Detector%d_dimension%d_before0",iter->first,itter->first),Form("Detector%d_dimension%d_before0",iter->first,itter->first),itter->second,0,itter->second);
+//            PlaneRawHist_NonZeroCut[iter->first][itter->first]->SetLineColor()
+            PlaneCutThresHist[iter->first][itter->first]=new TH1F(Form("Detector%d_dimension%d_thrHist",iter->first,itter->first),Form("Detector%d_dimension%d_thrHist",iter->first,itter->first),itter->second,0,itter->second);
+            PlaneCutThresHist[iter->first][itter->first]->SetLineColor(6);
+            PlaneRawHistRaw[iter->first][itter->first]->SetLineColor(7);
+            PlaneRawHist[iter->first][itter->first]->SetLineColor(2);
+        }
+    }
+
+
   map<int, vector<int> > mmHit;
   int mpd_id=0;
   int adc_ch=0;
   int hybridID=0;
-  
 
   map<int, vector<int> >::iterator it;
   for(it = mAPVRawSingleEvent.begin(); it!=mAPVRawSingleEvent.end(); ++it)
   {
-
     hybridID = it->first;
     mpd_id = GetMPD_ID(hybridID);     
     adc_ch = GetADC_ch(hybridID);
@@ -615,18 +724,29 @@ map<int, vector<int> > RawDecoder::DrawHits(map<int,vector<int> > mMapping, map<
     vector<int> adc_temp = it->second;
     int N = adc_temp.size();//774
     int TSsize=N/129;
+
+    // check the size of the frame
+    if(adc_temp.size()!=129*3){
+          if((adc_temp.size()>129*3)&&(adc_temp[386]==2)&&(adc_temp[128]==0)&&(adc_temp[257]==1)){
+              adc_temp.resize(129*3);
+          }else{
+              std::cout<<"  MisMatch::  expect 387   get : "<<adc_temp.size()<<"   skip!!("<<__FUNCTION__<<"@"<<__LINE__<<")"<<std::endl;
+              continue;
+          }
+      }
     //cout<<TSsize<<endl;//774
     int CommonMode[TSsize];
 
+    // load the pedestals
     for(int i=0;i<N;i++)
 	  {
-      if(mPedestalMean.find(hybridID)!=mPedestalMean.end())
-      {
-        if((i%129)!=128) adc_temp[i]-=mPedestalMean[hybridID][i%129];
-        //std::cout<<"Loading MPD="<<GetMPD_ID(hybridID)<<" ADC="<<GetADC_ch(hybridID)<<" in the pedestal file"<<std::endl;
-      }else{
-        std::cout<<"ERROR : can not find MPD="<<GetMPD_ID(hybridID)<<" ADC="<<GetADC_ch(hybridID)<<" in the pedestal file"<<std::endl;
-      }
+          if(mPedestalMean.find(hybridID)!=mPedestalMean.end())
+          {
+            if((i%129)!=128) adc_temp[i]-=mPedestalMean[hybridID][i%129];
+            //std::cout<<"Loading MPD="<<GetMPD_ID(hybridID)<<" ADC="<<GetADC_ch(hybridID)<<" in the pedestal file"<<std::endl;
+          }else{
+            std::cout<<"ERROR : can not find MPD="<<GetMPD_ID(hybridID)<<" ADC="<<GetADC_ch(hybridID)<<" in the pedestal file"<<std::endl;
+          }
 	  }
 
     for(int i=0; i<TSsize;i++)
@@ -638,18 +758,24 @@ map<int, vector<int> > RawDecoder::DrawHits(map<int,vector<int> > mMapping, map<
 	      //cout<<(singleTSadc_temp_sorting.size()-5)<<endl;
 	      sort(singleTSadc_temp_sorting.begin(),singleTSadc_temp_sorting.end()-1);
 
-	      for ( int k=10; k <118; k++) //omitting largest 4 channels for common mode, necessary to calculate this from the middle
+	      for ( int k=28; k <100; k++) //omitting largest 4 channels for common mode, necessary to calculate this from the middle
 	      {  
 	        CommonMode[i]+=singleTSadc_temp_sorting[k];
 	        //CommonMode[i]+=500;
 	      }
-
-	      CommonMode[i] = CommonMode[i]/108; 
+	      CommonMode[i] = CommonMode[i]/72;
 	      //	cout<<"Commonmode: "<<CommonMode[i];
       }
  
     for(int j=0; j<128;j++)
       {
+
+        int rawADC_aver=0;
+          for(int i=0;i<TSsize;i++){
+              rawADC_aver = rawADC_aver+adc_temp[j+129*i];
+          }
+          rawADC_aver = rawADC_aver/TSsize;
+
 	      int adcSum_temp=0;
 	      for(int i=0;i<TSsize;i++)
 	        {//cout<<"ADC:"<<adc_temp[j+129*i]<<"    ";
@@ -659,14 +785,10 @@ map<int, vector<int> > RawDecoder::DrawHits(map<int,vector<int> > mMapping, map<
 	      // cout<<endl<<endl;
 	      adcSum_temp = adcSum_temp/TSsize; 
   	    //cout<<j<<"Mean  "<<mPedestalMean[mpd_id][adc_ch][j]<<"  "<<mPedestalRMS[mpd_id][adc_ch][j]<<endl;
-        if(mPedestalRMS.find(hybridID)==mPedestalRMS.end()){
-          std::cout<<"ERROR : can not find MPD="<<GetMPD_ID(hybridID)<<" ADC="<<GetADC_ch(hybridID)<<" in the pedestal RMS file, skip it"<<std::endl;
-          continue;
-        }
 
-	      if(adcSum_temp>sigmacut*mPedestalRMS[hybridID][j])
+	      if((mPedestalRMS.find(hybridID)!=mPedestalRMS.end()))
 	        {
-            std::cout<<"Working on  MPD="<<GetMPD_ID(hybridID)<<" ADC="<<GetADC_ch(hybridID)<<" , get the graph  "<<__LINE__<<std::endl;
+//            std::cout<<"Working on  MPD="<<GetMPD_ID(hybridID)<<" ADC="<<GetADC_ch(hybridID)<<" , get the graph  "<<__LINE__<<std::endl;
             
 	          int RstripPos=j;	  
 	          int RstripNb = ChNb[j];
@@ -678,78 +800,71 @@ map<int, vector<int> > RawDecoder::DrawHits(map<int,vector<int> > mMapping, map<
 	          int planeID = mMapping[hybridID][1];
 	          int HitHybridID = (detID<<13)|(planeID<<12)|RstripPos;
 
-            
-            //hitHisto[(detID-4)*2+planeID]->Fill(RstripPos,adcSum_temp);
-            if(planeID){
-              std::cout<<"DetectorID :"<< detID << "  X-axix  Position:"<<RstripPos <<"  ADC"<<adcSum_temp<<std::endl;
-            }else
-            {
-              std::cout<<"DetectorID :"<< detID << "  Y-axix  Position:"<<RstripPos <<"  ADC"<<adcSum_temp<<std::endl;
-            }
-            plotData[detID][planeID][RstripNb]=adcSum_temp;
+	          PlaneRawHistRaw[detID][planeID]->Fill(RstripPos,rawADC_aver);
+	          PlaneRawHist_NonZeroCut[detID][planeID]->Fill(RstripPos,adcSum_temp);
+	          PlaneCutThresHist[detID][planeID]->Fill(RstripPos,sigmacut*mPedestalRMS[hybridID][j]);
+              if((adcSum_temp>sigmacut*mPedestalRMS[hybridID][j])){
+                  PlaneRawHist[detID][planeID]->Fill(RstripPos,adcSum_temp);
+	          }
+	          plotData[detID][planeID][RstripNb]=adcSum_temp;
             // Get all the hit, and draw it into the files
 	      } 
       }  
   }// 
 
-        const double PRexGEM_Position[]={50,100,200,500,800,1100,1400}; // this is the z-dimension
-        // position shift
-        const double shift_x[]={};
-        const double shift_Y[]={};
-
-        // this plot the z-x dimension
-	    std::map<int,std::map<int,TH1F *>> planehisto;
-
-	    auto plane_iter=plotData.begin();
-	    for (;plane_iter!=plotData.end();plane_iter++){
-
-	    	// loop on dimension
-	    	for(auto dimension_iter=(plane_iter->second).begin();dimension_iter!=(plane_iter->second).end();dimension_iter++){
-
-	    		for(auto pos_iter = dimension_iter->second.begin();pos_iter!=dimension_iter->second.end();pos_iter++){
-	    			if(planehisto.find(dimension_iter->first)!=planehisto.end() &&
-	    			            planehisto[dimension_iter->first].find(plane_iter->first)!=planehisto[dimension_iter->first].end()){
-
-	    			}else{
-	    				planehisto[dimension_iter->first][plane_iter->first]=
-	    						new TH1F(
-	    								Form("plane_%d_dimension_%d",plane_iter->first,dimension_iter->first),
-	                                    Form("plane_%d_dimension_%d",plane_iter->first,dimension_iter->first),1200,0,1200);
-	    				planehisto[dimension_iter->first][plane_iter->first]->GetXaxis()->SetRangeUser(0,1400);
-	    				planehisto[dimension_iter->first][plane_iter->first]->GetYaxis()->SetRangeUser(0,1500);
-
-	    			}
-	    			planehisto[dimension_iter->first][plane_iter->first]->Fill(pos_iter->first,PRexGEM_Position[plane_iter->first]);
-            std::cout<<"PlaneID: " <<(plane_iter->first)<<"Position ( "<< (pos_iter->first)<<",  "<<(PRexGEM_Position[plane_iter->first])<<std::endl;
+  // draw the canvas
+    c->Clear();
+    c->Divide(2,PlaneRawHist.size());
+    double counter_temp=1;
+    for (auto iter = PlaneRawHist.begin();iter!=PlaneRawHist.end(); iter++){
+        c->cd(counter_temp);
+//        PlaneRawHistRaw[iter->first][0]->Draw("hist");
+        PlaneRawHist_NonZeroCut[iter->first][0]->Draw("hist same");
+//        PlaneCutThresHist[iter->first][0]->Draw("hist same");
+        if(iter->second.find(0)!=iter->second.end()) {
+            (iter->second)[0]->Draw("hist same");
+            TPaveText *text0=new TPaveText(0.1,0.6,0.4,0.9,"NDC");
+            text0->AddText(Form("RMS:%f",(iter->second)[0]->GetRMS()));
+            text0->SetTextColor(kRed);
+            text0->Draw("same");
         }
-	      }
-	    }
-	   
-    c->cd();
-    unsigned char flag=0;
-	  for(auto dimension_iter=planehisto.begin();dimension_iter!=planehisto.end();dimension_iter++){
-		   for (auto plane_iter=dimension_iter->second.begin();plane_iter!=dimension_iter->second.end();plane_iter++){
-			   
-         plane_iter->second->SetMarkerStyle(20);
-         plane_iter->second->SetMarkerSize(1);
 
-         if(flag){
-           plane_iter->second->Draw("HISTPsame");
 
-           }else{
-             plane_iter->second->Draw("HISTP");
-           }
-         flag=1;
-		}
+
+        c->cd(counter_temp+1);
+//        PlaneRawHistRaw[iter->first][1]->Draw("hist");
+        PlaneRawHist_NonZeroCut[iter->first][1]->Draw("hist same");
+//        PlaneCutThresHist[iter->first][1]->Draw("hist same");
+        if(iter->second.find(1)!=iter->second.end()) {
+            (iter->second)[1]->Draw("hist same");
+            TPaveText *text1=new TPaveText(0.1,0.6,0.4,0.9,"NDC");
+            text1->AddText(Form("RMS:%f",(iter->second)[1]->GetRMS()));
+            text1->SetTextColor(kRed);
+            text1->Draw("same");
+        }
+        counter_temp+=2;
+    }
+    c->Update();
+
+    int typc = getchar();
+    // int typc=-1;
+    //  c->SaveAs(Form("Result/rawhisto_e%04d.png",idx_ec));
+
+    if ((typc==83) || (typc==115)) { // if s or S has pressed, it save the histos in a png file
+        c->SaveAs("Result/histoplot.root");
+        getchar(); // return key
     }
 
-  c->Update();
-  getchar();
-  for(auto dimension_iter=planehisto.begin();dimension_iter!=planehisto.end();dimension_iter++){
-  		   for (auto plane_iter=dimension_iter->second.begin();plane_iter!=dimension_iter->second.end();plane_iter++){
-  			 plane_iter->second->Delete();
+    if ((typc==80) || (typc==112)) { // if p or P has pressed, it save the histos in a pdf file
+        c->SaveAs("Result/rawhisto.pdf");
+        getchar(); // return key
+    }
 
-  		   }
-  }
+    for(auto iter = PlaneRawHist.begin(); iter!=PlaneRawHist.end();iter++){
+        for(auto itter=iter->second.begin(); itter!=iter->second.end(); itter++){
+            itter->second->Delete();
+        }
+    }
+
   return mmHit;
 }

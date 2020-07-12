@@ -57,7 +57,7 @@ int InputHandler::Initialize()
   if(runtype=="RawDataMonitor") 
     {
       gStyle->SetOptStat(0);
-      cRaw = new TCanvas("Raw_frame_Monitor","Raw Frame Monitor",0,0,1080, 1000);
+      cRaw = new TCanvas("Raw_frame_Monitor","Raw Frame Monitor",0,0,2080, 1960);
       cRaw->Divide(raw_co,raw_row);
       //cRaw->Divide(15,16,0.000001, 0.000001);
       /*  
@@ -101,7 +101,7 @@ int InputHandler::Initialize()
   if(runtype=="singleEventHitMonitor") 
     {
       LoadPedestalToRead();
-      cHit = new TCanvas("Hit_Monitor","Hit Monitor",0,0,1000,800);
+      cHit = new TCanvas("Hit_Monitor","Hit Monitor",0,0,2080,1960);
 //cHit->Divide(2,3);
     }
   return 1;
@@ -246,6 +246,7 @@ int InputHandler::InitRootFile()
   tCH      = new Int_t[100];
   ttiming  = new Double_t [100];
 
+
   Hit      = new TTree("GEMHit","Hit list");
 
   //-------------GEM----------------------
@@ -269,6 +270,8 @@ int InputHandler::InitRootFile()
   Hit->Branch("ntdc",&ntdc,"ntdc/I");//nb of tdc channel fired
   Hit->Branch("tCH",tCH,"tCH[ntdc]/I");//channel nb
   Hit->Branch("ttiming",ttiming,"ttiming[ntdc]/D");//tdc value
+  Hit->Branch("stripRMS",& stripRMS,"stripRMS/D"); // get the RMS for each GEM planes
+
 }
 
 
@@ -303,10 +306,11 @@ int InputHandler::ProcessAllFiles()
 	    //for_each(pList->begin(), pList->end(), toCout());
 	    //cout<<"##"<<endl;
 	    //getchar();
-	    cout<<"number of banks: "<<mpdEventList->size()<<endl;
-          if(EvtID%1000==0)
+	    //cout<<"number of banks: "<<mpdEventList->size()<<endl;
+	    cout<<"event: "<<EvtID<<endl;
+	    if(EvtID%1000==0)
 	      {
-		cout<<"event: "<<EvtID<<endl;
+		    cout<<"event: "<<EvtID<<endl;
 	      }
 	    evioDOMNodeList::iterator iter;
 	    for(iter=mpdEventList->begin(); iter!=mpdEventList->end(); ++iter)
@@ -384,9 +388,10 @@ int InputHandler::ProcessSingleSspEvent(const vector<uint32_t> &block_vec, int i
   RawDecoder raw_decoder(block_vec,istart,iend);
   
   if(runtype=="RawDataMonitor")  {
-//      raw_decoder.DrawRawHisto(cRaw); // Danning initial version
-      raw_decoder.DrawCorrectedRawHisto(mMapping,cRaw);    // Modified version, mapped the APV strip and APV position to the read oder
+      raw_decoder.DrawRawHisto(cRaw); // Danning initial version
+//      raw_decoder.DrawCorrectedRawHisto(mMapping,cRaw);    // Modified version, mapped the APV strip and APV position to the read oder
   }
+
 
   //pedestal mode
   if(runtype=="CalPedestal")     
