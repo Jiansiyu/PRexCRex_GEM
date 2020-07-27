@@ -307,7 +307,6 @@ int InputHandler::ProcessAllFiles()
 	    //cout<<"##"<<endl;
 	    //getchar();
 	    //cout<<"number of banks: "<<mpdEventList->size()<<endl;
-	    cout<<"event: "<<EvtID<<endl;
 	    if(EvtID%1000==0)
 	      {
 		    cout<<"event: "<<EvtID<<endl;

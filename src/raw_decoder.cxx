@@ -14,7 +14,8 @@
 #include <TH1F.h>
 #include <TCanvas.h>
 #include <TStyle.h>
-
+#include "TSystem.h"
+#include "TROOT.h"
 using namespace std;
 
 double sigmacut=5.0;
@@ -494,11 +495,8 @@ map<int, vector<int> > RawDecoder::ZeroSup(map<int,vector<int> > mMapping, map<i
 
 
     //===================================================================================================================
-    std::map<int, std::map<int, TH1F *>>PlaneRawHistRaw;  // strips　
-    std::map<int, std::map<int, TH1F *>>PlaneCutThresHist;  // strips　
-    std::map<int, std::map<int, TH1F *>>PlaneRawHist;  // strips that pass the 5-sigma cut
     std::map<int, std::map<int, TH1F *>>PlaneRawHist_NonZeroCut;  // strips that pass the 5-sigma cut
-//    std::cout<<"Map Size"<<mMapping.size()<<std::endl;
+
     //check how many GEM modules and CREATE
     std::map<int, std::map<int, int>> maxStrips;
     for (auto iter = mMapping.begin(); iter !=mMapping.end(); iter++){
@@ -517,13 +515,9 @@ map<int, vector<int> > RawDecoder::ZeroSup(map<int,vector<int> > mMapping, map<i
     // print out the detector information
     for (auto iter = maxStrips.begin(); iter!=maxStrips.end(); iter++){
         for (auto itter = iter->second.begin(); itter!=iter->second.end() ; ++itter) {
-            PlaneRawHistRaw[iter->first][itter->first]=new TH1F(Form("Detector%d_dimension%d_rawHist",iter->first,itter->first),Form("Detector%d_dimension%d_rawHist",iter->first,itter->first),itter->second,0,itter->second);
-            PlaneRawHist[iter->first][itter->first]=new TH1F(Form("Detector%d_dimension%d_HitHist",iter->first,itter->first),Form("Detector%d_dimension%d_HitHist",iter->first,itter->first),itter->second,0,itter->second);
+            PlaneRawHist_NonZeroCut[iter->first][itter->first]=(TH1F *)gROOT->FindObject(Form("Detector%d_dimension%d_before0",iter->first,itter->first));
+            if(PlaneRawHist_NonZeroCut[iter->first][itter->first]) PlaneRawHist_NonZeroCut[iter->first][itter->first]->Delete();
             PlaneRawHist_NonZeroCut[iter->first][itter->first]=new TH1F(Form("Detector%d_dimension%d_before0",iter->first,itter->first),Form("Detector%d_dimension%d_before0",iter->first,itter->first),itter->second,0,itter->second);
-            PlaneCutThresHist[iter->first][itter->first]=new TH1F(Form("Detector%d_dimension%d_thrHist",iter->first,itter->first),Form("Detector%d_dimension%d_thrHist",iter->first,itter->first),itter->second,0,itter->second);
-            PlaneCutThresHist[iter->first][itter->first]->SetLineColor(6);
-            PlaneRawHistRaw[iter->first][itter->first]->SetLineColor(7);
-            PlaneRawHist[iter->first][itter->first]->SetLineColor(2);
         }
     }
 //===================================================================================================================
@@ -613,10 +607,8 @@ map<int, vector<int> > RawDecoder::ZeroSup(map<int,vector<int> > mMapping, map<i
                   int detID = mMapping[hybridID][0];
                   int planeID = mMapping[hybridID][1];
                   int HitHybridID = (detID<<13)|(planeID<<12)|RstripPos;
-
-                  PlaneRawHist_NonZeroCut[detID][planeID]->Fill(RstripPos,adcSum_temp);
                   if((adcSum_temp>sigmacut*mPedestalRMS[hybridID][j])){
-                      PlaneRawHist[detID][planeID]->Fill(RstripPos,adcSum_temp);
+                      PlaneRawHist_NonZeroCut[detID][planeID]->Fill(RstripPos,adcSum_temp);
                   }
                   // Get all the hit, and draw it into the files
               }
@@ -643,7 +635,7 @@ map<int, vector<int> > RawDecoder::ZeroSup(map<int,vector<int> > mMapping, map<i
 	    int HitHybridID = (detID<<13)|(planeID<<12)|RstripPos;
 	    for(int i=0; i<TSsize;i++)
 	      { 
-		mmHit[HitHybridID].push_back(adc_temp[j+129*i]-CommonMode[i]);//if stop here, reduce 200ms/10k event
+		    mmHit[HitHybridID].push_back(adc_temp[j+129*i]-CommonMode[i]);//if stop here, reduce 200ms/10k event
 		//	cout<<(adc_temp[j+129*i]-CommonMode[i]-mPedestalMean[hybridID][j])<<"  ";
 	      }     
 	    //	    cout<<endl;
@@ -654,13 +646,19 @@ map<int, vector<int> > RawDecoder::ZeroSup(map<int,vector<int> > mMapping, map<i
   }//
   
   // get the maximum RMS, AND apply cut
-  for(auto iter = PlaneRawHist.begin(); iter!=PlaneRawHist.end(); iter++){
+  for(auto iter = PlaneRawHist_NonZeroCut.begin(); iter!=PlaneRawHist_NonZeroCut.end(); iter++){
       for (auto itter=iter->second.begin();itter!=iter->second.end();itter++){
           if(gemPlaneMaxRMS< itter->second->GetRMS()) gemPlaneMaxRMS=itter->second->GetRMS();
       }
   }
 
-  if(gemPlaneMaxRMS > 280) mmHit.clear();
+    for(auto iter = PlaneRawHist_NonZeroCut.begin(); iter!=PlaneRawHist_NonZeroCut.end(); iter++){
+        for (auto itter=iter->second.begin();itter!=iter->second.end();itter++){
+            itter->second->Delete();
+        }
+    }
+//    std::cout << gemPlaneMaxRMS<<std::endl;
+    if(gemPlaneMaxRMS > 50) mmHit.clear();
 
   return mmHit;
 }
@@ -866,5 +864,15 @@ map<int, vector<int> > RawDecoder::DrawHits(map<int,vector<int> > mMapping, map<
         }
     }
 
+    for (auto iter = maxStrips.begin(); iter!=maxStrips.end(); iter++){
+        for (auto itter = iter->second.begin(); itter!=iter->second.end() ; ++itter) {
+//            std::cout <<"Detector::"<<iter->first<<"    PlaneID::"<<itter->first<<"    value::"<<itter->second<<std::endl;
+            PlaneRawHistRaw[iter->first][itter->first]->Delete();
+            PlaneRawHist[iter->first][itter->first]->Delete();
+            PlaneRawHist_NonZeroCut[iter->first][itter->first]->Delete();
+//            PlaneRawHist_NonZeroCut[iter->first][itter->first]->SetLineColor()
+            PlaneCutThresHist[iter->first][itter->first]->Delete();
+        }
+    }
   return mmHit;
 }
